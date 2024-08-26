@@ -1,0 +1,11 @@
+FAIL
+Kernel panic in run: PANIC at ../../threads/interrupt.c:268 in intr_yield_on_return(): assertion `intr_context ()' failed.
+Call stack: 0x80042134d7 0x800420866c 0x8004209a0e 0x8004209e98 0x8004207a3d 0x800420698e 0x8004206068
+Translation of call stack:
+0x00000080042134d7: debug_panic (lib/kernel/debug.c:32)
+0x000000800420866c: intr_yield_on_return (threads/interrupt.c:269)
+0x0000008004209a0e: sema_down (threads/synch.c:84)
+0x0000008004209e98: lock_acquire (threads/synch.c:212)
+0x0000008004207a3d: allocate_tid (threads/thread.c:677)
+0x000000800420698e: thread_init (threads/thread.c:122)
+0x0000008004206068: main (threads/init.c:83)

@@ -91,10 +91,11 @@ timer_elapsed (int64_t then) {
 void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
+	struct thread *curr = thread_current();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	curr->wakeUpTime = timer_ticks() + ticks;
+	sleepThread(curr);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -122,9 +123,14 @@ timer_print_stats (void) {
 }
 
 /* Timer interrupt handler. */
+//	타이머 인터럽트 핸들러. 그니까 중요함 
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
+	//	인터럽트 핸들러는 원칙상 (핀토스가 아닌 상용 os 에서도)
+	//	락 획득이 불법이므로 락, 모니터 락 등을 풀어줄 수 없다.
+	//	적어도 여기다가 cond_broadcast 써서 문제를 풀 수는 없다는 뜻.
 	ticks++;
+	//	그럼 얘로 풀어보겟슴
 	thread_tick ();
 }
 

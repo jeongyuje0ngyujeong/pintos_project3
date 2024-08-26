@@ -90,10 +90,16 @@ struct thread {
 	tid_t tid;                          /* Thread identifier. */
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
+	int originalPriority;
 	int priority;                       /* Priority. */
 
 	/* Shared between thread.c and synch.c. */
+	//	링크드 리스트의 노드가 되기 위한 list_elem 구조체
+	//	(명시적 가용 리스트에서 사용했던 것 처럼)
 	struct list_elem elem;              /* List element. */
+	int64_t wakeUpTime;
+	//	준용 추가
+	struct list lockList;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -132,6 +138,11 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+
+//	sleep_list 순회 함수
+void checkSleepingThreads(void);
+//	sleep_list 에 추가하는 함수
+void sleepThread(struct thread *th);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
