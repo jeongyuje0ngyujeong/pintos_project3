@@ -108,6 +108,7 @@ donor_thread_func (void *locks_)
 static void
 interloper_thread_func (void *arg_ UNUSED)
 {
+  msg ("%d", thread_get_priority());
   msg ("%s finished.", thread_name ());
 }
 

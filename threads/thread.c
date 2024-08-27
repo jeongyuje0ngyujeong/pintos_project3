@@ -260,6 +260,7 @@ tid_t thread_create(const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock(t);
+	preempt();
 
 	return tid;
 }
@@ -296,14 +297,16 @@ void thread_unblock(struct thread *t)
 	ASSERT(t->status == THREAD_BLOCKED);
 	list_insert_ordered(&ready_list, &t->elem, sortByPriority, NULL);
 	t->status = THREAD_READY;
-	if (thread_current() != idle_thread
-		&& !list_empty(&ready_list)
-		&& list_entry(list_front(&ready_list), struct thread, elem)->priority > thread_current()->priority
-	)
+
+	intr_set_level(old_level);
+}
+
+//	준용 추가
+void preempt(void) {
+	if (thread_current() != idle_thread && !list_empty(&ready_list) && list_entry(list_begin(&ready_list), struct thread, elem)->priority > thread_current()->priority)
 	{
 		thread_yield();
 	}
-	intr_set_level(old_level);
 }
 
 /* Returns the name of the running thread. */
@@ -378,11 +381,19 @@ void thread_yield(void)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
-	thread_current()->priority = new_priority;
-	if (!list_empty(&ready_list) && list_entry(list_front(&ready_list), struct thread, elem)->priority > new_priority)
+	thread_current()->originalPriority = new_priority;
+	findRealPriority();
+	if (!list_empty(&ready_list) && list_entry(list_front(&ready_list), struct thread, elem)->priority > thread_get_priority())
 	{
 		thread_yield();
 	}
+}
+
+//	준용 추가
+void threadSetPriority(struct thread *th, int new_priority)
+{
+	th->priority = new_priority;
+	preempt();
 }
 
 /* Returns the current thread's priority. */
@@ -485,7 +496,8 @@ init_thread(struct thread *t, const char *name, int priority)
 	//	준용 추가
 	t->originalPriority = priority;
 	t->priority = priority;
-	list_init(&t->lockList);
+	t->lock = NULL;
+	list_init(&t->holdLocks);
 
 	t->magic = THREAD_MAGIC;
 }
@@ -607,8 +619,7 @@ static bool sortByPriority(struct list_elem *a, struct list_elem *b, void *aux)
 	int priorityA = list_entry(a, struct thread, elem)->priority;
 	int priorityB = list_entry(b, struct thread, elem)->priority;
 
-	bool returnValue = (priorityA > priorityB) ? true : false;
-	return returnValue;
+	return priorityA > priorityB;
 }
 
 /* Schedules a new process. At entry, interrupts must be off.

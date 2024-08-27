@@ -98,8 +98,11 @@ struct thread {
 	//	(명시적 가용 리스트에서 사용했던 것 처럼)
 	struct list_elem elem;              /* List element. */
 	int64_t wakeUpTime;
-	//	준용 추가
-	struct list lockList;
+
+	//	쓰레드가 점유하기 위해 대기하고 있는 lock 의 포인터
+	struct lock *lock;
+	//	쓰레드가 점유하고 있는 lock 의 리스트
+	struct list holdLocks;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -132,6 +135,9 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 void thread_block (void);
 void thread_unblock (struct thread *);
 
+//	준용 추가
+void preempt (void);
+
 struct thread *thread_current (void);
 tid_t thread_tid (void);
 const char *thread_name (void);
@@ -153,5 +159,8 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
+//	준용 추가
+void threadSetPriority(struct thread *th, int new_priority);
 
 #endif /* threads/thread.h */

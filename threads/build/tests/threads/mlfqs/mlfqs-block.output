@@ -1,11 +1,17 @@
 Kernel command line: -q -mlfqs run mlfqs-block
-Kernel PANIC at ../../threads/interrupt.c:268 in intr_yield_on_return(): assertion `intr_context ()' failed.
-Call stack: 0x80042134d7 0x800420866c 0x8004209a0e 0x8004209e98 0x8004207a3d 0x800420698e 0x8004206068.
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  52,377,600 loops/s.
+Boot complete.
+Executing 'mlfqs-block':
+Kernel PANIC at ../../tests/threads/tests.c:60 in run_test(): no test named "mlfqs-block"
+Call stack: 0x80042137ff 0x8004216cad 0x8004206636 0x8004206783 0x8004206120.
 The `backtrace' program can make call stacks useful.
 Read "Backtraces" in the "Debugging Tools" chapter
 of the Pintos documentation for more information.
-Timer: 0 ticks
-Thread: 0 idle ticks, 0 kernel ticks, 0 user ticks
-Console: 480 characters output
-Keyboard: 0 keys pressed
-Powering off...
+Timer: 19 ticks
+Thread: 0 idle ticks, 19 kernel ticks, 0 user ticks
+Console: 
