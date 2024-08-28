@@ -383,10 +383,7 @@ void thread_set_priority(int new_priority)
 {
 	thread_current()->originalPriority = new_priority;
 	findRealPriority();
-	if (!list_empty(&ready_list) && list_entry(list_front(&ready_list), struct thread, elem)->priority > thread_get_priority())
-	{
-		thread_yield();
-	}
+	preempt();
 }
 
 //	준용 추가

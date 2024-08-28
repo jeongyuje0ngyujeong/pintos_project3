@@ -205,7 +205,7 @@ void lock_acquire(struct lock *lock)
 	ASSERT(!lock_held_by_current_thread(lock));
 
 	//	준용 추가
-	if (lock->holder != NULL)
+	if (lock->holder != NULL && thread_get_priority() > lock->holder->priority)
 	{
 		thread_current()->lock = lock;
 		if (lock->priority < thread_get_priority())
@@ -217,8 +217,9 @@ void lock_acquire(struct lock *lock)
 
 	sema_down(&lock->semaphore);
 
-	//	준용 추가
 	struct thread *cur = thread_current();
+
+	//	준용 추가
 	cur->lock = NULL;
 	list_push_back(&cur->holdLocks, &lock->elem);
 	lock->priority = cur->priority;
@@ -298,9 +299,10 @@ void donatePriority(struct thread *th, int newPriority)
 	{
 		if (th->lock != NULL)
 		{
+			th->lock->priority = newPriority;
 			donatePriority(th->lock->holder, newPriority);
 		}
-		threadSetPriority(th, newPriority);
+		th->priority = newPriority;
 	}
 }
 
