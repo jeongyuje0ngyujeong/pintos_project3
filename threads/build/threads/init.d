@@ -13,4 +13,5 @@ threads/init.o: ../../threads/init.c ../../include/threads/init.h \
  ../../include/threads/mmu.h ../../include/threads/pte.h \
  ../../include/threads/vaddr.h ../../include/threads/palloc.h \
  ../../include/threads/thread.h ../../include/lib/kernel/list.h \
+ ../../include/lib/kernel/bitmap.h ../../include/lib/inttypes.h \
  ../../tests/threads/tests.h
