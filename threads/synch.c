@@ -73,7 +73,7 @@ void sema_down(struct semaphore *sema)
 	ASSERT(!intr_context());
 
 	old_level = intr_disable();
-	//	준용 변경 (while to if)
+
 	while (sema->value == 0)
 	{
 		list_push_back(&sema->waiters, &thread_current()->elem);
@@ -204,25 +204,32 @@ void lock_acquire(struct lock *lock)
 	ASSERT(!intr_context());
 	ASSERT(!lock_held_by_current_thread(lock));
 
-	//	준용 추가
-	if (lock->holder != NULL && thread_get_priority() > lock->holder->priority)
+	if (!thread_mlfqs)
 	{
-		thread_current()->lock = lock;
-		if (lock->priority < thread_get_priority())
+		//	준용 추가
+		if (lock->holder != NULL
+			// && thread_get_priority() > lock->holder->priority
+		)
 		{
-			lock->priority = thread_get_priority();
+			thread_current()->lock = lock;
+			if (lock->priority < thread_get_priority())
+			{
+				lock->priority = thread_get_priority();
+			}
+			donatePriority(lock->holder, thread_get_priority());
 		}
-		donatePriority(lock->holder, thread_get_priority());
 	}
 
 	sema_down(&lock->semaphore);
-
 	struct thread *cur = thread_current();
 
 	//	준용 추가
-	cur->lock = NULL;
-	list_push_back(&cur->holdLocks, &lock->elem);
-	lock->priority = cur->priority;
+	if (!thread_mlfqs)
+	{
+		cur->lock = NULL;
+		list_push_back(&cur->holdLocks, &lock->elem);
+		lock->priority = cur->priority;
+	}
 
 	lock->holder = cur;
 }
@@ -260,26 +267,22 @@ void lock_release(struct lock *lock)
 	lock->holder = NULL;
 
 	//	준용 추가
-	list_remove(&lock->elem);
-	findRealPriority();
-
-	sema_up(&lock->semaphore);
-}
-
-//	준용 추가
-void findRealPriority()
-{
-	int realPriority = thread_current()->originalPriority;
-	struct list_elem *node = list_begin(&thread_current()->holdLocks);
-	while (node != list_end(&thread_current()->holdLocks))
+	if (!thread_mlfqs)
 	{
-		if (list_entry(node, struct lock, elem)->priority > realPriority)
+		list_remove(&lock->elem);
+		int realPriority = thread_current()->originalPriority;
+		struct list_elem *node = list_begin(&thread_current()->holdLocks);
+		while (node != list_end(&thread_current()->holdLocks))
 		{
-			realPriority = list_entry(node, struct lock, elem)->priority;
+			if (list_entry(node, struct lock, elem)->priority > realPriority)
+			{
+				realPriority = list_entry(node, struct lock, elem)->priority;
+			}
+			node = node->next;
 		}
-		node = node->next;
+		thread_current()->priority = realPriority;
 	}
-	thread_current()->priority = realPriority;
+	sema_up(&lock->semaphore);
 }
 
 /* Returns true if the current thread holds LOCK, false

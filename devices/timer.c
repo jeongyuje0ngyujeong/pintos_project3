@@ -132,6 +132,11 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	//	그럼 얘로 풀어보겟슴
 	thread_tick ();
+	//	준용 추가
+	if (ticks % TIMER_FREQ == 0) {
+		caculateLoadAvg();
+		caculateRecentCpu();
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
