@@ -112,6 +112,11 @@ struct thread
 	//	allList 에 포함되기 위해 사용되는 elem
 	struct list_elem allElem;
 
+	//	준용추가
+	//	나중에 다 하고 아래 ifdef 로 내려줘야 함
+	int exitStatus;
+	int nextDescriptor;
+	struct file *descriptors[(1 << 12)];
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */

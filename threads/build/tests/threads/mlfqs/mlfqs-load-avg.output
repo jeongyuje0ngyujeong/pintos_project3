@@ -8,6 +8,7 @@ Calibrating timer...  58,880,000 loops/s.
 Boot complete.
 Executing 'mlfqs-load-avg':
 (mlfqs-load-avg) begin
+(mlfqs-load-avg) my name: main
 (mlfqs-load-avg) Starting 60 load threads...
 (mlfqs-load-avg) Starting threads took 0 seconds.
 (mlfqs-load-avg) After 0 seconds, load average=0.00.
@@ -103,7 +104,7 @@ Executing 'mlfqs-load-avg':
 (mlfqs-load-avg) end
 Execution of 'mlfqs-load-avg' complete.
 Timer: 18824 ticks
-Thread: 6896 idle ticks, 11928 kernel ticks, 0 user ticks
-Console: 5500 characters output
+Thread: 6892 idle ticks, 11932 kernel ticks, 0 user ticks
+Console: 5531 characters output
 Keyboard: 0 keys pressed
 Powering off...

@@ -4,6 +4,12 @@
         "list.h": "c",
         "bitmap.h": "c",
         "stdlib.h": "c",
-        "palloc.h": "c"
+        "palloc.h": "c",
+        "tests.h": "c",
+        "file.h": "c",
+        "*.inc": "c",
+        "syscall-nr.h": "c",
+        "stdint.h": "c",
+        "syscall.h": "c"
     }
 }

@@ -44,13 +44,13 @@ static struct list destruction_req;
 struct list sleep_list;
 
 //	recentCpu 는 현재 존재하는 모든 쓰레드들에 대해 재계산 되어야 하므로,
-//	그냥 싹다 담을 리스트 필요 ..
+//	그냥 싹다 담을 리스트 필요
 struct list allList;
 
-//	bitmap for mlfqs
+//	유사 비트맵
 size_t mlfqBits = 0;
 
-//	list array for mlfqs
+//	멀티 큐를 저장할 배열
 struct list arrayOfqueue[64];
 
 //	시스템 부하 평균
@@ -258,9 +258,12 @@ void caculateAllPriority(void)
 int caculatePriority(struct thread *th)
 {
 	int newPriority = FtoI(ItoF(PRI_MAX) - (th->recentCpu / 4) - ItoF(th->nice * 2));
-	if (newPriority > PRI_MAX) {
+	if (newPriority > PRI_MAX)
+	{
 		newPriority = PRI_MAX;
-	} else if (newPriority < PRI_MIN) {
+	}
+	else if (newPriority < PRI_MIN)
+	{
 		newPriority = PRI_MIN;
 	}
 	return newPriority;
@@ -446,7 +449,9 @@ void preempt(void)
 				if (i > thread_current()->priority)
 				{
 					thread_yield();
-				} else {
+				}
+				else
+				{
 					return;
 				}
 			}
@@ -652,6 +657,8 @@ init_thread(struct thread *t, const char *name, int priority)
 	strlcpy(t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
+	//	준용 추가, 0번 1번은 std in / out
+	t->nextDescriptor = 2;
 
 	//	준용 추가
 	if (!thread_mlfqs)
