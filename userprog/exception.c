@@ -107,37 +107,6 @@ kill(struct intr_frame *f)
 	}
 }
 
-/* Reads a byte at user virtual address UADDR.
- * UADDR must be below KERN_BASE.
- * Returns the byte value if successful, -1 if a segfault
- * occurred. */
-static int64_t
-get_user(const uint8_t *uaddr)
-{
-	int64_t result;
-	__asm __volatile(
-		"movabsq $done_get, %0\n"
-		"movzbq %1, %0\n"
-		"done_get:\n"
-		: "=&a"(result) : "m"(*uaddr));
-	return result;
-}
-
-/* Writes BYTE to user address UDST.
- * UDST must be below KERN_BASE.
- * Returns true if successful, false if a segfault occurred. */
-static bool
-put_user(uint8_t *udst, uint8_t byte)
-{
-	int64_t error_code;
-	__asm __volatile(
-		"movabsq $done_put, %0\n"
-		"movb %b2, %1\n"
-		"done_put:\n"
-		: "=&a"(error_code), "=m"(*udst) : "q"(byte));
-	return error_code != -1;
-}
-
 /* Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to project 2 may
    also require modifying this code.
@@ -181,6 +150,11 @@ page_fault(struct intr_frame *f)
 
 	/* Count page faults. */
 	page_fault_cnt++;
+
+	//	준용 추가 (제작중 ㅎㅎ;)
+	if (user) {
+		exit(-1);
+	}
 
 	/* If the fault is true fault, show info and exit. */
 	printf("Page fault at %p: %s error %s page in %s context.\n",

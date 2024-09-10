@@ -8,8 +8,12 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 //	준용 추가
-#include "file.h"
+#include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "userprog/process.h"
+#include "threads/palloc.h"
+#include "threads/synch.h"
+#include <string.h>
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -41,52 +45,110 @@ void syscall_init(void)
 }
 
 //	준용 추가
+
+/* Reads a byte at user virtual address UADDR.
+ * UADDR must be below KERN_BASE.
+ * Returns the byte value if successful, -1 if a segfault
+ * occurred. */
+static int64_t
+get_user(const uint8_t *uaddr)
+{
+	int64_t result;
+	__asm __volatile(
+		"movabsq $done_get, %0\n"
+		"movzbq %1, %0\n"
+		"done_get:\n"
+		: "=&a"(result) : "m"(*uaddr));
+	return result;
+}
+
+/* Writes BYTE to user address UDST.
+ * UDST must be below KERN_BASE.
+ * Returns true if successful, false if a segfault occurred. */
+static bool
+put_user(uint8_t *udst, uint8_t byte)
+{
+	int64_t error_code;
+	__asm __volatile(
+		"movabsq $done_put, %0\n"
+		"movb %b2, %1\n"
+		"done_put:\n"
+		: "=&a"(error_code), "=m"(*udst) : "q"(byte));
+	return error_code != -1;
+}
+
+void isLegalAddr(void *ptr)
+{
+	struct thread *th = thread_current();
+	if (is_kernel_vaddr(ptr) || ptr == NULL || pml4_get_page(th->pml4, ptr) == NULL)
+	{
+		exit(-1);
+	}
+}
+
 void exit(int status)
 {
 	thread_current()->exitStatus = status;
 	thread_exit();
 }
 
-void fork(const char *thread_name, struct intr_frame *f)
+tid_t fork(const char *thread_name, struct intr_frame *frame)
 {
-	//	thread_create 를 쓰거나, 비슷하게 작성하면 될 듯.
+	tid_t returnPid = process_fork(thread_name, frame);
+	enum intr_level old_intr = intr_disable();
+	thread_block();
+	intr_set_level(old_intr);
+	return returnPid;
 }
 
 bool create(const char *file, unsigned initial_size)
 {
+	isLegalAddr(file);
 	return filesys_create(file, (off_t)initial_size);
 }
 
 bool remove(const char *file)
 {
+	isLegalAddr(file);
 	return filesys_remove(file);
 }
 
 bool isFileOpened(int fd)
 {
-	if (thread_current()->descriptors[fd] == NULL)
+	if (0 <= fd && fd < 30)
 	{
-		return false;
+		if (thread_current()->descriptors[fd] != NULL)
+		{
+			return true;
+		}
 	}
-	else
-	{
-		return true;
-	}
+	return false;
 }
 
 int open(const char *file)
 {
+	isLegalAddr(file);
 	struct thread *th = thread_current();
-	if (th->nextDescriptor >= (1 << 12))
+	if (th->nextDescriptor >= 30)
 	{
-		return -1;
+		exit(-1);
 	}
 	else
 	{
 		int desc = th->nextDescriptor;
 		th->descriptors[desc] = filesys_open(file);
-		th->nextDescriptor++;
-		return desc;
+		if (th->descriptors[desc] == NULL)
+		{
+			return -1;
+		}
+		else
+		{
+			while (th->descriptors[th->nextDescriptor] != NULL)
+			{
+				th->nextDescriptor++;
+			}
+			return desc;
+		}
 	}
 }
 
@@ -98,21 +160,28 @@ int filesize(int fd)
 	}
 	else
 	{
-		return -1;
+		exit(-1);
 	}
 }
 
 int read(int fd, void *buffer, unsigned size)
 {
-	if (isFileOpened(fd)) {
-		
-	} else {
-		return -1;
+	isLegalAddr(buffer);
+	if (isFileOpened(fd))
+	{
+		struct file *target = thread_current()->descriptors[fd];
+		off_t returnValue = file_read(target, buffer, (off_t)size);
+		return returnValue;
+	}
+	else
+	{
+		exit(-1);
 	}
 }
 
 int write(int fd, const void *buffer, unsigned size)
 {
+	isLegalAddr(buffer);
 	if (fd == STDOUT_FILENO)
 	{
 		putbuf(buffer, size);
@@ -121,9 +190,70 @@ int write(int fd, const void *buffer, unsigned size)
 	else if (isFileOpened(fd))
 	{
 		struct file *target = thread_current()->descriptors[fd];
-		return file_write(target, buffer, (off_t)size);
+		off_t returnValue = file_write(target, buffer, (off_t)size);
+		return returnValue;
+	}
+	else
+	{
+		exit(-1);
+	}
+}
+
+void seek(int fd, unsigned position)
+{
+	if (isFileOpened(fd))
+	{
+		file_seek(thread_current()->descriptors[fd], (off_t)position);
+	}
+	else
+	{
+		exit(-1);
+	}
+}
+
+unsigned tell(int fd)
+{
+	if (isFileOpened(fd))
+	{
+		return thread_current()->descriptors[fd];
+	}
+	else
+	{
+		exit(-1);
+	}
+}
+
+void close(int fd)
+{
+	if (isFileOpened(fd))
+	{
+		file_close(thread_current()->descriptors[fd]);
+		thread_current()->descriptors[fd] = NULL;
+		thread_current()->nextDescriptor = fd;
+	}
+	else
+	{
+		exit(-1);
+	}
+}
+
+int exec(const char *cmd_line)
+{
+	isLegalAddr(cmd_line);
+	char *cmdCopy = palloc_get_page(0);
+
+	file_close(thread_current()->execFile);
+	strlcpy(cmdCopy, cmd_line, PGSIZE);
+	if (process_exec(cmdCopy))
+	{
+		exit(-1);
 	}
 	return -1;
+}
+
+tid_t wait(tid_t pid)
+{
+	return process_wait(pid);
 }
 
 /* The main system call interface */
@@ -141,11 +271,13 @@ void syscall_handler(struct intr_frame *f)
 		exit(f->R.rdi);
 		break;
 	case SYS_FORK:
-		fork(f->R.rdi, f);
+		f->R.rax = fork(f->R.rdi, f);
 		break;
 	case SYS_EXEC:
+		f->R.rax = exec(f->R.rdi);
 		break;
 	case SYS_WAIT:
+		f->R.rax = wait(f->R.rdi);
 		break;
 	case SYS_CREATE:
 		f->R.rax = create(f->R.rdi, f->R.rsi);
@@ -166,10 +298,13 @@ void syscall_handler(struct intr_frame *f)
 		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_SEEK:
+		seek(f->R.rdi, f->R.rsi);
 		break;
 	case SYS_TELL:
+		f->R.rax = tell(f->R.rdi);
 		break;
 	case SYS_CLOSE:
+		close(f->R.rdi);
 		break;
 	}
 }

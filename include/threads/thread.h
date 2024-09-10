@@ -29,6 +29,9 @@ typedef int tid_t;
 #define PRI_DEFAULT 31 /* Default priority. */
 #define PRI_MAX 63	   /* Highest priority. */
 
+//	준용 추가
+#define KERN_EXIT 0x2347861
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -116,10 +119,20 @@ struct thread
 	//	나중에 다 하고 아래 ifdef 로 내려줘야 함
 	int exitStatus;
 	int nextDescriptor;
-	struct file *descriptors[(1 << 12)];
+	struct file *descriptors[30];
+	//	for wait
+	bool wakeUpParent;
+	int waitStatus;
+	struct thread *parent;
+	struct list childs;
+	struct list_elem pgElem;
+	//	for fork
+	struct intr_frame *forkFrame;
+	//	for write deny
+	struct file *execFile;
+	uint64_t *pml4; /* Page map level 4 */
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
-	uint64_t *pml4; /* Page map level 4 */
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */

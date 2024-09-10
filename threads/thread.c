@@ -659,6 +659,21 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->priority = priority;
 	//	준용 추가, 0번 1번은 std in / out
 	t->nextDescriptor = 2;
+	//	for wait
+	t->wakeUpParent = false;
+	t->exitStatus = KERN_EXIT;
+
+	if (is_thread(running_thread()))
+	{
+		t->parent = thread_current();
+		list_push_back(&t->parent->childs, &t->pgElem);
+	}
+	list_init(&t->childs);
+	
+	for (int i = t->nextDescriptor; i < 30; i++)
+	{
+		t->descriptors[i] = NULL;
+	}
 
 	//	준용 추가
 	if (!thread_mlfqs)

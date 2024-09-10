@@ -79,11 +79,13 @@ initd(void *f_name)
 
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
-tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
+tid_t process_fork(const char *name, struct intr_frame *if_)
 {
 	/* Clone current thread to new thread.*/
+	//	준용 변경
+	thread_current()->forkFrame = if_;
 	return thread_create(name,
-						 PRI_DEFAULT, __do_fork, thread_current());
+						 thread_current()->priority, __do_fork, thread_current());
 }
 
 #ifndef VM
@@ -99,23 +101,35 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if (is_kern_pte(pte) || is_kernel_vaddr(va))
+	{
+		goto immeReturn;
+	}
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page(parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	newpage = palloc_get_page(PAL_USER);
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	writable = is_writable(pte) == 0 ? false : true;
+	memcpy(newpage, parent_page, PGSIZE);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page(current->pml4, va, newpage, writable))
 	{
 		/* 6. TODO: if fail to insert page, do error handling. */
+		palloc_free_page(newpage);
+		pml4_destroy(current->pml4);
+		return false;
 	}
+
+immeReturn:
 	return true;
 }
 #endif
@@ -131,7 +145,8 @@ __do_fork(void *aux)
 	struct thread *parent = (struct thread *)aux;
 	struct thread *current = thread_current();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	//	준용 변경 ( 초기화 해줌 ) 이자식 바꿔야함
+	struct intr_frame *parent_if = parent->forkFrame;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -158,12 +173,35 @@ __do_fork(void *aux)
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
-	process_init();
+	//	준용 추가
+	current->nextDescriptor = parent->nextDescriptor;
+	int i = 0;
 
+	while (i < 30)
+	{
+		if (parent->descriptors[i] != NULL)
+		{
+			current->descriptors[i] = file_duplicate(parent->descriptors[i]);
+			if (current->descriptors[i] == NULL)
+			{
+				goto error;
+			}
+		}
+		i++;
+	}
+	// 여까지
+
+	process_init();
+	if_.R.rax = 0;
+
+	thread_unblock(parent);
+	// thread_yield();
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret(&if_);
 error:
+	parent_if->R.rax = TID_ERROR;
+	thread_unblock(parent);
 	thread_exit();
 }
 
@@ -187,7 +225,6 @@ int process_exec(void *f_name)
 
 	/* And then load the binary */
 	success = load(file_name, &_if);
-
 	/* If load failed, quit. */
 	palloc_free_page(file_name);
 	if (!success)
@@ -207,14 +244,27 @@ int process_exec(void *f_name)
  *
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
-int process_wait(tid_t child_tid UNUSED)
+int process_wait(tid_t child_tid)
 {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	for (int i = 0; i < (1 << 29); i++)
+
+	struct thread *th = thread_current();
+	struct list_elem *node = list_begin(&th->childs);
+
+	while (node != list_end(&th->childs))
 	{
-		continue;
+		struct thread *chth = list_entry(node, struct thread, pgElem);
+		if (chth->tid == child_tid)
+		{
+			chth->wakeUpParent = true;
+			enum intr_level old_intr = intr_disable();
+			thread_block();
+			intr_set_level(old_intr);
+			return th->waitStatus;
+		}
+		node = node->next;
 	}
 	return -1;
 }
@@ -228,7 +278,19 @@ void process_exit(void)
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 	process_cleanup();
-	printf("%s: exit(%d)\n", curr->name, curr->exitStatus);
+	if (curr->exitStatus != KERN_EXIT)
+	{
+		printf("%s: exit(%d)\n", curr->name, curr->exitStatus);
+	}
+
+	//	준용 추가
+	list_remove(&curr->pgElem);
+	if (curr->wakeUpParent)
+	{
+		curr->parent->waitStatus = curr->exitStatus;
+		thread_unblock(curr->parent);
+	}
+	file_close(curr->execFile);
 }
 
 /* Free the current process's resources. */
@@ -359,12 +421,19 @@ load(const char *file_name, struct intr_frame *if_)
 	process_activate(thread_current());
 
 	/* Open executable file. */
+
+	//	for test
+	printf("trying to open: %s\n",file_name);
+	
 	file = filesys_open(exeName);
 	if (file == NULL)
 	{
 		printf("load: %s: open failed\n", exeName);
 		goto done;
 	}
+
+	//	for test
+	printf("i opened: %s\n",file_name);
 
 	/* Read and verify executable header. */
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
@@ -477,12 +546,19 @@ load(const char *file_name, struct intr_frame *if_)
 	*(uintptr_t *)if_->rsp = (void *)0;
 
 	//	여기까지 준용 추가
-
 	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close(file);
+	//	준용 변경 (원래 걍 클로즈함)
+	if (success)
+	{
+		t->execFile = file;
+		file_deny_write(file);
+	} else {
+		t->execFile = NULL;
+		file_close(file);
+	}
 	return success;
 }
 
