@@ -101,17 +101,23 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
-	if (is_kern_pte(pte) || is_kernel_vaddr(va))
+	if (is_kernel_vaddr(va) || is_kern_pte(pte))
 	{
 		goto immeReturn;
 	}
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page(parent->pml4, va);
+	if (parent_page == NULL) {
+		return false;
+	}
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
 	newpage = palloc_get_page(PAL_USER);
+	if (newpage == NULL) {
+		return false;
+	}
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
@@ -128,7 +134,6 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
 		pml4_destroy(current->pml4);
 		return false;
 	}
-
 immeReturn:
 	return true;
 }
@@ -177,7 +182,7 @@ __do_fork(void *aux)
 	current->nextDescriptor = parent->nextDescriptor;
 	int i = 0;
 
-	while (i < 30)
+	while (i < FD_MAX)
 	{
 		if (parent->descriptors[i] != NULL)
 		{
@@ -252,21 +257,36 @@ int process_wait(tid_t child_tid)
 
 	struct thread *th = thread_current();
 	struct list_elem *node = list_begin(&th->childs);
+	int returnVal = -1;
 
 	while (node != list_end(&th->childs))
 	{
 		struct thread *chth = list_entry(node, struct thread, pgElem);
 		if (chth->tid == child_tid)
 		{
-			chth->wakeUpParent = true;
-			enum intr_level old_intr = intr_disable();
-			thread_block();
-			intr_set_level(old_intr);
-			return th->waitStatus;
+			if (chth->status == THREAD_DYING)
+			{
+				returnVal = chth->exitStatus;
+				list_remove(node);
+				palloc_free_page(chth);
+				return returnVal;
+			}
+			else
+			{
+				chth->wakeUpParent = true;
+				enum intr_level oldlevel = intr_disable();
+				thread_block();
+				intr_set_level(oldlevel);
+				returnVal = chth->exitStatus;
+				list_remove(node);
+				palloc_free_page(chth);
+				return returnVal;
+			}
 		}
 		node = node->next;
 	}
-	return -1;
+	//	그런 자식 없어요
+	return returnVal;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -284,12 +304,17 @@ void process_exit(void)
 	}
 
 	//	준용 추가
-	list_remove(&curr->pgElem);
-	if (curr->wakeUpParent)
+	if (curr->parent != NULL && curr->wakeUpParent)
 	{
-		curr->parent->waitStatus = curr->exitStatus;
 		thread_unblock(curr->parent);
 	}
+	//	열린 파일 정리
+	for (int i = 0; i < FD_MAX; i++) {
+		if (curr->descriptors[i] != NULL) {
+			file_close(curr->descriptors[i]);
+		}
+	}
+
 	file_close(curr->execFile);
 }
 
@@ -422,18 +447,12 @@ load(const char *file_name, struct intr_frame *if_)
 
 	/* Open executable file. */
 
-	//	for test
-	printf("trying to open: %s\n",file_name);
-	
 	file = filesys_open(exeName);
 	if (file == NULL)
 	{
 		printf("load: %s: open failed\n", exeName);
 		goto done;
 	}
-
-	//	for test
-	printf("i opened: %s\n",file_name);
 
 	/* Read and verify executable header. */
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
@@ -555,7 +574,9 @@ done:
 	{
 		t->execFile = file;
 		file_deny_write(file);
-	} else {
+	}
+	else
+	{
 		t->execFile = NULL;
 		file_close(file);
 	}

@@ -124,7 +124,7 @@ void sema_up(struct semaphore *sema)
 		//	제일 우선순위 높은 놈
 		//	지금 문제는 처음부터 리스트 순회하면서 제일 작은놈을 잡아옴. 그럼 끝에 있는 노드가
 		//	올 수 밖에 없음. 이 부분 수정할 것.
-		struct list_elem *nextWaiter = list_max(&sema->waiters, sortByPriority, NULL);
+		struct list_elem *nextWaiter = list_min(&sema->waiters, sortByPriority, NULL);
 		list_remove(nextWaiter);
 		thread_unblock(list_entry(nextWaiter, struct thread, elem));
 	}

@@ -504,10 +504,22 @@ tid_t thread_tid(void)
 void thread_exit(void)
 {
 	ASSERT(!intr_context());
+	struct thread *curr = thread_current();
 
 #ifdef USERPROG
 	process_exit();
 #endif
+	//	좀비프로세스 처리
+	struct list_elem *node = list_begin(&curr->childs);
+	while (node != list_end(&curr->childs))
+	{
+		struct thread *ch = list_entry(node, struct thread, pgElem);
+		ch->parent = NULL;
+		if (ch->status == THREAD_DYING) {
+			palloc_free_page(ch);
+		}
+		node = node->next;
+	}
 
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
@@ -663,14 +675,19 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->wakeUpParent = false;
 	t->exitStatus = KERN_EXIT;
 
+	//	너 init 이니?
 	if (is_thread(running_thread()))
 	{
+		//	아니요
 		t->parent = thread_current();
 		list_push_back(&t->parent->childs, &t->pgElem);
+	} else {
+		//	네
+		t->parent = NULL;
 	}
 	list_init(&t->childs);
 	
-	for (int i = t->nextDescriptor; i < 30; i++)
+	for (int i = t->nextDescriptor; i < FD_MAX; i++)
 	{
 		t->descriptors[i] = NULL;
 	}
@@ -891,8 +908,10 @@ schedule(void)
 				readyThreads--;
 				list_remove(&curr->allElem);
 			}
-
-			list_push_back(&destruction_req, &curr->elem);
+			// 준용 변경 - 부모가 없으면 그냥 종료 (init thread 거나, 부모가 먼저 종료된 경우)
+			if (curr->parent == NULL) {
+				list_push_back(&destruction_req, &curr->elem);
+			}
 		}
 
 		/* Before switching the thread, we first save the information

@@ -31,6 +31,7 @@ typedef int tid_t;
 
 //	준용 추가
 #define KERN_EXIT 0x2347861
+#define FD_MAX 30
 
 /* A kernel thread or user process.
  *
@@ -119,10 +120,9 @@ struct thread
 	//	나중에 다 하고 아래 ifdef 로 내려줘야 함
 	int exitStatus;
 	int nextDescriptor;
-	struct file *descriptors[30];
+	struct file *descriptors[FD_MAX];
 	//	for wait
 	bool wakeUpParent;
-	int waitStatus;
 	struct thread *parent;
 	struct list childs;
 	struct list_elem pgElem;

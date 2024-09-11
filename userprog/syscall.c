@@ -98,6 +98,9 @@ tid_t fork(const char *thread_name, struct intr_frame *frame)
 	enum intr_level old_intr = intr_disable();
 	thread_block();
 	intr_set_level(old_intr);
+	if (frame->R.rax == TID_ERROR) {
+		return TID_ERROR;
+	}
 	return returnPid;
 }
 
@@ -115,7 +118,7 @@ bool remove(const char *file)
 
 bool isFileOpened(int fd)
 {
-	if (0 <= fd && fd < 30)
+	if (0 <= fd && fd < FD_MAX)
 	{
 		if (thread_current()->descriptors[fd] != NULL)
 		{
@@ -129,9 +132,9 @@ int open(const char *file)
 {
 	isLegalAddr(file);
 	struct thread *th = thread_current();
-	if (th->nextDescriptor >= 30)
+	if (th->nextDescriptor >= FD_MAX)
 	{
-		exit(-1);
+		return -1;
 	}
 	else
 	{
