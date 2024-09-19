@@ -510,15 +510,13 @@ void thread_exit(void)
 	process_exit();
 #endif
 	//	좀비프로세스 처리
-	struct list_elem *node = list_begin(&curr->childs);
-	while (node != list_end(&curr->childs))
+	while (!list_empty(&curr->childs))
 	{
-		struct thread *ch = list_entry(node, struct thread, pgElem);
+		struct thread *ch = list_entry(list_pop_front(&curr->childs), struct thread, pgElem);
 		ch->parent = NULL;
 		if (ch->status == THREAD_DYING) {
 			palloc_free_page(ch);
 		}
-		node = node->next;
 	}
 
 	/* Just set our status to dying and schedule another process.

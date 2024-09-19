@@ -31,7 +31,7 @@ typedef int tid_t;
 
 //	준용 추가
 #define KERN_EXIT 0x2347861
-#define FD_MAX 30
+#define FD_MAX 40
 
 /* A kernel thread or user process.
  *
@@ -116,6 +116,7 @@ struct thread
 	//	allList 에 포함되기 위해 사용되는 elem
 	struct list_elem allElem;
 
+#ifdef USERPROG
 	//	준용추가
 	//	나중에 다 하고 아래 ifdef 로 내려줘야 함
 	int exitStatus;
@@ -131,7 +132,6 @@ struct thread
 	//	for write deny
 	struct file *execFile;
 	uint64_t *pml4; /* Page map level 4 */
-#ifdef USERPROG
 	/* Owned by userprog/process.c. */
 #endif
 #ifdef VM
