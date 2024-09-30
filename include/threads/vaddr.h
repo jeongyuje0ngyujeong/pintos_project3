@@ -37,6 +37,9 @@
 /* User stack start */
 #define USER_STACK 0x47480000
 
+/* 태현 추가 */
+#define STACK_LIMIT (USER_STACK - (1 << 20))
+
 /* Returns true if VADDR is a user virtual address. */
 #define is_user_vaddr(vaddr) (!is_kernel_vaddr((vaddr)))
 

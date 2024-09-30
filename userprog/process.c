@@ -46,7 +46,7 @@ tid_t process_create_initd(const char *file_name)
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
-	fn_copy = palloc_get_page(0);
+	fn_copy = palloc_get_page(PAL_ZERO);
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy(fn_copy, file_name, PGSIZE);
@@ -66,6 +66,7 @@ tid_t process_create_initd(const char *file_name)
 static void
 initd(void *f_name)
 {
+
 #ifdef VM
 	supplemental_page_table_init(&thread_current()->spt);
 #endif
@@ -216,7 +217,7 @@ int process_exec(void *f_name)
 {
 	char *file_name = f_name;
 	bool success;
-
+	
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -234,7 +235,6 @@ int process_exec(void *f_name)
 	palloc_free_page(file_name);
 	if (!success)
 		return -1;
-
 	/* Start switched process. */
 	do_iret(&_if);
 	NOT_REACHED();
@@ -741,9 +741,25 @@ install_page(void *upage, void *kpage, bool writable)
 static bool
 lazy_load_segment(struct page *page, void *aux)
 {
+	// printf("lazy_load\n");
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	/* 태현 추가 */
+	struct aux *info = (struct aux*)aux;
+
+    file_seek(info->file, info->ofs);
+
+    if (file_read(info->file, page->frame->kva, info->page_read_bytes) != (int)info->page_read_bytes) {
+        return false;  
+    }
+
+    memset(page->frame->kva + info->page_read_bytes, 0, info->page_zero_bytes);
+	// printf("\n\nhello\n\n");
+    free(aux);
+
+    return true;
+	
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -777,15 +793,21 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		void *aux = NULL;
-		if (!vm_alloc_page_with_initializer(VM_ANON, upage,
-											writable, lazy_load_segment, aux))
+		struct aux *aux = malloc (sizeof (struct aux));
+		if (aux == NULL) return false;
+		aux->file = file;
+		aux->ofs = ofs;
+		aux->page_read_bytes = page_read_bytes;
+		aux->page_zero_bytes = page_zero_bytes;
+		if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, aux)) {
 			return false;
+		}
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+		ofs += page_read_bytes;
 	}
 	return true;
 }
@@ -796,11 +818,16 @@ setup_stack(struct intr_frame *if_)
 {
 	bool success = false;
 	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
-
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)) {
+		success = vm_claim_page(stack_bottom);
+		if (success) {
+			if_->rsp = USER_STACK;
+		}
+	}
 
 	return success;
 }

@@ -21,6 +21,8 @@
         "debug.h": "c",
         "syn-write.h": "c",
         "lib.h": "c",
-        "thread.h": "c"
+        "thread.h": "c",
+        "loader.h": "c",
+        "vm.h": "c"
     }
 }

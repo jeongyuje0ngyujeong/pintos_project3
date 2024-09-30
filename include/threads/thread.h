@@ -33,6 +33,10 @@ typedef int tid_t;
 #define KERN_EXIT 0x2347861
 #define FD_MAX 40
 
+//	태현 추가
+#define VM
+// #define USERPROG
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -137,6 +141,8 @@ struct thread
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	/* 태현 추가 */
+	void *rsp;
 #endif
 
 	/* Owned by thread.c. */

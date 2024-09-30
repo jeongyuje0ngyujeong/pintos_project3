@@ -2,6 +2,8 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+/* 태현 추가 */
+#include "hash.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -46,6 +48,9 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
+	/* 태현 추가 */
+	struct hash_elem hash_elem;
+	bool writable;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -76,6 +81,14 @@ struct page_operations {
 	enum vm_type type;
 };
 
+/* 태현 추가 */
+struct aux {
+	struct file *file;
+	off_t ofs;
+	size_t page_read_bytes;
+	size_t page_zero_bytes;
+};
+
 #define swap_in(page, v) (page)->operations->swap_in ((page), v)
 #define swap_out(page) (page)->operations->swap_out (page)
 #define destroy(page) \
@@ -85,6 +98,7 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	struct hash hash
 };
 
 #include "threads/thread.h"
@@ -108,5 +122,9 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
+/* 태현 추가 */
+unsigned page_hash (struct hash_elem *p, void *aux UNUSED);
+bool page_less (const struct hash_elem *a, const struct hash_elem *b, void *aux);
+void spt_remove_func (struct hash_elem *elem, void *aux UNUSED);
 
 #endif  /* VM_VM_H */

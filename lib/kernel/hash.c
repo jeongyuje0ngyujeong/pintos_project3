@@ -80,7 +80,7 @@ hash_clear (struct hash *h, hash_action_func *destructor) {
 void
 hash_destroy (struct hash *h, hash_action_func *destructor) {
 	if (destructor != NULL)
-		hash_clear (h, destructor);
+		hash_clear(h, destructor);
 	free (h->buckets);
 }
 
@@ -391,4 +391,3 @@ remove_elem (struct hash *h, struct hash_elem *e) {
 	h->elem_cnt--;
 	list_remove (&e->list_elem);
 }
-
