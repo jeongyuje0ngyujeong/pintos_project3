@@ -23,6 +23,12 @@
         "lib.h": "c",
         "thread.h": "c",
         "loader.h": "c",
-        "vm.h": "c"
+        "vm.h": "c",
+        "intrinsic.h": "c",
+        "stdbool.h": "c",
+        "inspect.h": "c",
+        "malloc.h": "c",
+        "stddef.h": "c",
+        "inttypes.h": "c"
     }
 }

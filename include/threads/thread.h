@@ -35,6 +35,7 @@ typedef int tid_t;
 
 //	태현 추가
 #define VM
+#define USERPROG
 // #define USERPROG
 
 /* A kernel thread or user process.

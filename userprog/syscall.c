@@ -14,6 +14,7 @@
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include <string.h>
+#include "vm/vm.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -98,7 +99,8 @@ tid_t fork(const char *thread_name, struct intr_frame *frame)
 	enum intr_level old_intr = intr_disable();
 	thread_block();
 	intr_set_level(old_intr);
-	if (frame->R.rax == TID_ERROR) {
+	if (frame->R.rax == TID_ERROR)
+	{
 		return TID_ERROR;
 	}
 	return returnPid;
@@ -170,6 +172,11 @@ int filesize(int fd)
 int read(int fd, void *buffer, unsigned size)
 {
 	isLegalAddr(buffer);
+	if (pml4_get_page(thread_current()->pml4, buffer) &&
+		!spt_find_page(&thread_current()->spt, buffer)->writable)
+	{
+		exit(-1);
+	}
 	if (isFileOpened(fd))
 	{
 		struct file *target = thread_current()->descriptors[fd];
@@ -260,6 +267,35 @@ tid_t wait(tid_t pid)
 	return process_wait(pid);
 }
 
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
+{
+	if (!addr || addr != pg_round_down(addr))
+		return NULL;
+
+	if (offset != pg_round_down(offset))
+		return NULL;
+
+	if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length))
+		return NULL;
+
+	if (spt_find_page(&thread_current()->spt, addr))
+		return NULL;
+
+	struct file *f = thread_current()->descriptors[fd];
+	if (f == NULL)
+		return NULL;
+
+	if (file_length(f) == 0 || (int)length <= 0)
+		return NULL;
+
+	return do_mmap(addr, length, writable, f, offset);
+}
+
+void *munmap(void *addr)
+{
+	do_munmap(addr);
+}
+
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f)
 {
@@ -311,6 +347,12 @@ void syscall_handler(struct intr_frame *f)
 		break;
 	case SYS_CLOSE:
 		close(f->R.rdi);
+		break;
+	case SYS_MMAP:
+		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+		break;
+	case SYS_MUNMAP:
+		munmap(f->R.rdi);
 		break;
 	}
 }

@@ -109,14 +109,16 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page(parent->pml4, va);
-	if (parent_page == NULL) {
+	if (parent_page == NULL)
+	{
 		return false;
 	}
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
 	newpage = palloc_get_page(PAL_USER);
-	if (newpage == NULL) {
+	if (newpage == NULL)
+	{
 		return false;
 	}
 
@@ -217,7 +219,7 @@ int process_exec(void *f_name)
 {
 	char *file_name = f_name;
 	bool success;
-	
+
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -309,8 +311,10 @@ void process_exit(void)
 		thread_unblock(curr->parent);
 	}
 	//	열린 파일 정리
-	for (int i = 0; i < FD_MAX; i++) {
-		if (curr->descriptors[i] != NULL) {
+	for (int i = 0; i < FD_MAX; i++)
+	{
+		if (curr->descriptors[i] != NULL)
+		{
 			file_close(curr->descriptors[i]);
 		}
 	}
@@ -746,20 +750,20 @@ lazy_load_segment(struct page *page, void *aux)
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
 	/* 태현 추가 */
-	struct aux *info = (struct aux*)aux;
+	struct aux *info = (struct aux *)aux;
 
-    file_seek(info->file, info->ofs);
+	file_seek(info->file, info->ofs);
 
-    if (file_read(info->file, page->frame->kva, info->page_read_bytes) != (int)info->page_read_bytes) {
-        return false;  
-    }
+	if (file_read(info->file, page->frame->kva, info->page_read_bytes) != (int)info->page_read_bytes)
+	{
+		return false;
+	}
 
-    memset(page->frame->kva + info->page_read_bytes, 0, info->page_zero_bytes);
+	memset(page->frame->kva + info->page_read_bytes, 0, info->page_zero_bytes);
 	// printf("\n\nhello\n\n");
-    free(aux);
+	free(aux);
 
-    return true;
-	
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -793,13 +797,15 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
-		struct aux *aux = malloc (sizeof (struct aux));
-		if (aux == NULL) return false;
+		struct aux *aux = malloc(sizeof(struct aux));
+		if (aux == NULL)
+			return false;
 		aux->file = file;
 		aux->ofs = ofs;
 		aux->page_read_bytes = page_read_bytes;
 		aux->page_zero_bytes = page_zero_bytes;
-		if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, aux)) {
+		if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, aux))
+		{
 			return false;
 		}
 
@@ -822,9 +828,11 @@ setup_stack(struct intr_frame *if_)
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
-	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)) {
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1))
+	{
 		success = vm_claim_page(stack_bottom);
-		if (success) {
+		if (success)
+		{
 			if_->rsp = USER_STACK;
 		}
 	}
